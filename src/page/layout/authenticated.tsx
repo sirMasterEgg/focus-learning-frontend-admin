@@ -1,5 +1,5 @@
 import logo from "@/assets/icon.svg";
-import { Outlet } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,15 +9,46 @@ import {
 import { Button } from "@/components/ui/button.tsx";
 import { ChevronDown } from "lucide-react";
 import { RootState } from "@/stores/store.ts";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import { useLogoutMutation } from "@/api/core/auth/logout.api.ts";
+import { toast } from "@/hooks/use-toast.ts";
+import { RouteList } from "@/lib/route-list.ts";
+import { AxiosError } from "axios";
+import { unsetUser } from "@/stores/slices/auth.slices.ts";
 
 export default function AuthenticatedLayout() {
   const auth = useSelector((state: RootState) => state.auth);
 
+  const logoutMutation = useLogoutMutation();
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+
   const handleLogout = () => {
-    //
-    console.log(auth);
-    console.log("Logout");
+    logoutMutation.mutate(
+      [
+        {
+          token: auth.token as string,
+        },
+      ],
+      {
+        onSuccess: () => {
+          dispatch(unsetUser());
+          navigate(RouteList.LOGIN, {
+            replace: true,
+          });
+        },
+        onError: (error) => {
+          if (error instanceof AxiosError) {
+            if (error?.response?.status && error.response.status >= 400) {
+              toast({
+                variant: "destructive",
+                description: error.response.data.message,
+              });
+            }
+          }
+        },
+      }
+    );
   };
 
   return (
@@ -32,7 +63,7 @@ export default function AuthenticatedLayout() {
               className="w-40 justify-between font-normal"
               variant="outline"
             >
-              Admin
+              {auth.user?.name}
               <ChevronDown className="w-4 h-4 opacity-50" />
             </Button>
           </DropdownMenuTrigger>
