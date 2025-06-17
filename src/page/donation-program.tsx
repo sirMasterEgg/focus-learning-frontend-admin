@@ -1,270 +1,218 @@
 import PageSize from "@/components/page-size.tsx";
 import TextFilter from "@/components/text-filter.tsx";
-import { DataTable } from "@/components/datatable.tsx";
-import { overviewTableColumns } from "@/types/table-overview.tsx";
 import { Card } from "@/components/ui/card.tsx";
+import { useSelector } from "react-redux";
+import { RootState } from "@/stores/store.ts";
+import { useState } from "react";
+import {
+  DONATION_QUERY_KEY,
+  useGetDonationQuery,
+} from "@/api/core/donations/get-donations.api.ts";
+import { useSearchParams } from "react-router-dom";
+import {
+  DonationListTable,
+  donationListTableColumns,
+} from "@/types/table-donation-program.tsx";
+import CreateDonationProgram from "@/components/create-donation-program.tsx";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { Plus, Save, Send } from "lucide-react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog.tsx";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form.tsx";
-import { Input } from "@/components/ui/input.tsx";
-import RichTextEditor from "@/components/rich-text-editor.tsx";
-import CurrencyInput from "@/components/amount-input.tsx";
-
-const addFormSchema = z.object({
-  program_name: z.string().min(1, {
-    message: "Program name is required",
-  }),
-  recipient_name: z.string().min(1, {
-    message: "Recipient name is required",
-  }),
-  thumbnail: z
-    .instanceof(File, {
-      message: "Thumbnail is required",
-    })
-    .refine((file) => file.size < 10000000, {
-      message: "Your thumbnail must be less than 10MB.",
-    })
-    .refine((file) => file.type.startsWith("image/"), {
-      message: "Your thumbnail must be an image",
-    }),
-  program_image: z
-    .instanceof(File, {
-      message: "Program image is required",
-    })
-    .refine((file) => file.size < 10000000, {
-      message: "Your program image must be less than 10MB.",
-    })
-    .refine((file) => file.type.startsWith("image/"), {
-      message: "Your program image must be an image",
-    }),
-  description: z.string(),
-  target_amount: z.number().min(1, {
-    message: "Target amount must be greater than 0",
-  }),
-});
+  Check,
+  Info,
+  LoaderCircle,
+  MoreHorizontal,
+  SquarePen,
+  Trash2,
+  X,
+} from "lucide-react";
+import { Row } from "@tanstack/react-table";
+import { DataTable } from "@/components/datatable.tsx";
+import { DonationActionModal } from "@/components/donation-action-modal.tsx";
+import { useUpdateDonationMutation } from "@/api/core/donations/update-donations.api.ts";
+import { useQueryClient } from "@tanstack/react-query";
+import { Badge } from "@/components/ui/badge.tsx";
 
 export default function DonationProgram() {
-  const addForm = useForm<z.infer<typeof addFormSchema>>({
-    resolver: zodResolver(addFormSchema),
-    defaultValues: {
-      program_name: "",
-      recipient_name: "",
-      thumbnail: undefined,
-      program_image: undefined,
-      description: "",
-      target_amount: 0,
+  const auth = useSelector((state: RootState) => state.auth);
+  const [searchParams] = useSearchParams();
+  const getDonationQuery = useGetDonationQuery([
+    auth.token || "",
+    {
+      q: searchParams.get("q"),
+      page: searchParams.get("page"),
+      size: searchParams.get("size"),
+      from: searchParams.get("from"),
+      to: searchParams.get("to"),
     },
-  });
+  ]);
 
-  function onSubmit(values: z.infer<typeof addFormSchema>) {
-    // Do something with the form values.
-    // ✅ This will be type-safe and validated.
-    console.log(values);
-  }
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedDonation, setSelectedDonation] =
+    useState<DonationListTable | null>(null);
+  const [actionType, setActionType] = useState<"view" | "edit" | "delete" | "">(
+    ""
+  );
+
+  const openModal = (
+    event: React.MouseEvent<HTMLDivElement, MouseEvent>,
+    action: "view" | "edit" | "delete",
+    donation: DonationListTable
+  ) => {
+    event.preventDefault();
+
+    setActionType(action);
+    setSelectedDonation(donation);
+    setModalOpen(true);
+  };
+
+  const updateStatusMutation = useUpdateDonationMutation();
+  const queryClient = useQueryClient();
+  const [loadingRow, setLoadingRow] = useState<string>("");
+
+  const handleUpdateStatus = (donation: DonationListTable) => {
+    setLoadingRow(donation.id);
+
+    const form = new FormData();
+    form.append("is_active", !donation.is_active ? "1" : "0");
+
+    updateStatusMutation.mutate(
+      [auth.token as string, donation.human_readable_id, form],
+      {
+        onSettled: () => {
+          queryClient
+            .invalidateQueries({ queryKey: [DONATION_QUERY_KEY] })
+            .then(() => {
+              setLoadingRow("");
+            });
+        },
+      }
+    );
+  };
+
+  const columns = [
+    ...donationListTableColumns,
+    {
+      header: "Status",
+      cell: ({ row }: { row: Row<DonationListTable> }) => {
+        if (row.original.deleted_at) {
+          return <Badge variant={"secondary"}>Deleted</Badge>;
+        }
+
+        if (loadingRow && loadingRow === row.original.id) {
+          return <LoaderCircle className="animate-spin" />;
+        }
+
+        return row.original.is_active ? (
+          <Badge className="border-transparent bg-success text-success-foreground shadow hover:bg-success/80">
+            Active
+          </Badge>
+        ) : (
+          <Badge variant="destructive">Inactive</Badge>
+        );
+      },
+    },
+    {
+      header: "Action",
+      cell: ({ row }: { row: Row<DonationListTable> }) => {
+        const donation = row.original;
+        if (donation.deleted_at) {
+          return null;
+        }
+
+        return (
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button className="h-8 w-8 p-0" disabled={!!loadingRow}>
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {!donation.is_active ? (
+                  <DropdownMenuItem
+                    onClick={() => handleUpdateStatus(donation)}
+                  >
+                    <Check />
+                    Activate
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={() => handleUpdateStatus(donation)}
+                  >
+                    <X />
+                    Deactivate
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={(e) => openModal(e, "view", donation)}
+                >
+                  <Info />
+                  View
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={(e) => openModal(e, "edit", donation)}
+                >
+                  <SquarePen />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-red-500 focus:bg-red-100/50 focus:text-red-500"
+                  onClick={(e) => openModal(e, "delete", donation)}
+                >
+                  <Trash2 />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        );
+      },
+    },
+  ];
 
   return (
     <>
       <Card>
         <div className="p-6 inline-flex flex-row justify-between items-center w-full">
           <h1 className="text-xl font-semibold">Donation Program List</h1>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus />
-                Create Program
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[calc(100vh_-_8rem)] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Add Program</DialogTitle>
-                <DialogDescription>
-                  Fill out the details below to launch a new donation program.
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...addForm}>
-                <form
-                  onSubmit={addForm.handleSubmit(onSubmit)}
-                  className="space-y-2"
-                >
-                  <FormField
-                    control={addForm.control}
-                    name="program_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Program Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Write program name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={addForm.control}
-                    name="recipient_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Recipient Name</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Write recipient name"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={addForm.control}
-                    name="thumbnail"
-                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                    render={({ field: { value, onChange, ...fieldProps } }) => (
-                      <FormItem>
-                        <FormLabel>Thumbnail</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...fieldProps}
-                            type="file"
-                            placeholder="Choose an image to represent the program (thumbnail)"
-                            accept="image/*"
-                            onChange={(event) =>
-                              onChange(
-                                event.target.files && event.target.files[0]
-                              )
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={addForm.control}
-                    name="program_image"
-                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                    render={({ field: { value, onChange, ...fieldProps } }) => (
-                      <FormItem>
-                        <FormLabel>Program Image</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...fieldProps}
-                            type="file"
-                            placeholder="Choose an image to represent the program"
-                            accept="image/*"
-                            onChange={(event) =>
-                              onChange(
-                                event.target.files && event.target.files[0]
-                              )
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={addForm.control}
-                    name="description"
-                    render={({ field: { value, onChange } }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <RichTextEditor
-                            placeholder="Write a description"
-                            value={value}
-                            onChange={onChange}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={addForm.control}
-                    name="target_amount"
-                    render={({ field: { onChange, value, ...field } }) => (
-                      <FormItem>
-                        <FormLabel>Target Amount</FormLabel>
-                        <FormControl>
-                          <CurrencyInput
-                            onChange={(value) => onChange(Number(value))}
-                            value={value.toString()}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div className="inline-flex flex-row gap-2 pt-2">
-                    <Button type="submit" variant="secondary">
-                      <Save /> Save
-                    </Button>
-                    <Button type="submit">
-                      <Send /> Save & Activate
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
+          <CreateDonationProgram />
         </div>
         <div className="px-6 pb-6">
           <div className="py-4 inline-flex flex-row items-center gap-5">
             <PageSize />
             <TextFilter placeholder="Find Program Name" />
           </div>
-          {/*todo: check data*/}
-          {/*<>
-                  <div className="flex items-center justify-center">
-                    No data to be displayed
-                  </div>
-                </>*/}
-
-          <DataTable
-            columns={overviewTableColumns}
-            data={Array.from({ length: 20 }).map(() => ({
-              invoice_number: "INV-001",
-              date: new Date(),
-              donor_name: "John Doe",
-              program_name: "Education Support Program",
-              amount: 5000000000,
-              method: "Credit Card",
-              status: "PAID",
-            }))}
-            meta={{
-              total: 50,
-              per_page: 15,
-              current_page: 1,
-              last_page: 4,
-              first_page_url: "http://laravel.app?page=1",
-              last_page_url: "http://laravel.app?page=4",
-              next_page_url: "http://laravel.app?page=2",
-              prev_page_url: undefined,
-              path: "http://laravel.app",
-              from: 1,
-              to: 15,
-            }}
-          />
+          {getDonationQuery.isLoading ? (
+            <>
+              <div className="flex items-center justify-center min-h-80">
+                <LoaderCircle className="animate-spin" />
+              </div>
+            </>
+          ) : (
+            getDonationQuery.data?.data && (
+              <>
+                <DataTable
+                  columns={columns}
+                  data={getDonationQuery?.data?.data}
+                  meta={getDonationQuery?.data?.meta}
+                />
+                <DonationActionModal
+                  isOpen={modalOpen}
+                  onOpenChange={setModalOpen}
+                  donation={selectedDonation}
+                  actionType={actionType}
+                />
+              </>
+            )
+          )}
         </div>
       </Card>
     </>

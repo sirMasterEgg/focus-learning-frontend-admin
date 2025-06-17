@@ -1,4 +1,4 @@
-import { addDays, format } from "date-fns";
+import { format, subDays } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { DateRange } from "react-day-picker";
 
@@ -13,12 +13,19 @@ import {
 import { HTMLAttributes, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+type DateRangePickerProps = {
+  from?: Date;
+  to?: Date;
+} & HTMLAttributes<HTMLDivElement>;
+
 export function DatePickerWithRange({
   className,
-}: HTMLAttributes<HTMLDivElement>) {
+  from = subDays(new Date(), 7),
+  to = new Date(),
+}: DateRangePickerProps) {
   const [date, setDate] = useState<DateRange | undefined>({
-    from: new Date(),
-    to: addDays(new Date(), 7),
+    from: from,
+    to: to,
   });
 
   const [searchParams, setSearchParams] = useSearchParams();

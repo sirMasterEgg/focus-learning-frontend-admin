@@ -6,12 +6,14 @@ type RichTextEditorProps = {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  readOnly?: boolean;
 };
 
 const RichTextEditor = ({
   value,
   onChange,
   placeholder,
+  readOnly = false,
 }: RichTextEditorProps) => {
   const { quill, quillRef } = useQuill({
     modules: {
@@ -30,6 +32,7 @@ const RichTextEditor = ({
       ],
     },
     placeholder,
+    readOnly,
   });
 
   useEffect(() => {
@@ -38,6 +41,14 @@ const RichTextEditor = ({
       quill.clipboard.dangerouslyPasteHTML(value);
     }
   }, [quill, value]);
+
+  useEffect(() => {
+    if (quill && readOnly) {
+      quill.disable();
+    } else if (quill) {
+      quill.enable();
+    }
+  }, [quill, readOnly]);
 
   useEffect(() => {
     if (quill) {
@@ -53,6 +64,7 @@ const RichTextEditor = ({
       };
 
       quill.on("text-change", handleTextChange);
+      quill.blur();
 
       return () => {
         quill.off("text-change", handleTextChange);

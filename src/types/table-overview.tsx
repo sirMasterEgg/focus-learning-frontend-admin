@@ -1,16 +1,8 @@
 import { ColumnDef } from "@tanstack/react-table";
-import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
+import { DonationHistoriesDto } from "@/types/type.ts";
 
-export type OverviewTable = {
-  invoice_number: string;
-  date: Date;
-  donor_name: string;
-  program_name: string;
-  amount: number;
-  method: string;
-  status: string;
-};
+export type OverviewTable = DonationHistoriesDto & {};
 
 export const overviewTableColumns: ColumnDef<OverviewTable>[] = [
   {
@@ -18,24 +10,30 @@ export const overviewTableColumns: ColumnDef<OverviewTable>[] = [
     cell: ({ row }) => (row.index + 1).toString() + ".",
   },
   {
-    accessorKey: "invoice_number",
+    accessorKey: "human_readable_id",
     header: "Invoice Number",
   },
   {
-    accessorKey: "date",
+    accessorKey: "created_at",
     header: "Date",
     cell: ({ row }) => {
-      const date = new Date(row.original.date).toLocaleDateString("en-UK", {
-        dateStyle: "medium",
-      });
-      const time = new Date(row.original.date).toLocaleTimeString("en-UK", {
-        timeStyle: "short",
-      });
+      const date = new Date(row.original.created_at).toLocaleDateString(
+        "en-UK",
+        {
+          dateStyle: "medium",
+        }
+      );
+      const time = new Date(row.original.created_at).toLocaleTimeString(
+        "en-UK",
+        {
+          timeStyle: "short",
+        }
+      );
       return `${date} ${time}`;
     },
   },
   {
-    accessorKey: "donor_name",
+    accessorKey: "name",
     header: "Donor Name",
   },
   {
@@ -43,44 +41,46 @@ export const overviewTableColumns: ColumnDef<OverviewTable>[] = [
     header: "Program Name",
   },
   {
-    accessorKey: "amount",
+    accessorKey: "donation_amount",
     header: "Amount",
     cell: ({ row }) => {
       const amount = new Intl.NumberFormat("id-ID", {
         style: "currency",
         currency: "IDR",
         maximumFractionDigits: 0,
-      }).format(row.original.amount);
+      }).format(row.original.donation_amount);
       return amount;
     },
   },
   {
-    accessorKey: "method",
+    accessorKey: "payment.method",
     header: "Method",
   },
   {
-    accessorKey: "status",
+    accessorKey: "payment.status",
     header: "Status",
     cell: ({ row }) => {
-      switch (row.original.status) {
-        case "PAID":
+      switch (row.original.payment.status.toUpperCase()) {
+        case "SUCCESS":
           return (
             <>
               <Badge className="border-transparent bg-success text-success-foreground shadow hover:bg-success/80">
-                {row.original.status}
+                {row.original.payment.status.toUpperCase()}
               </Badge>
             </>
           );
         case "PENDING":
           return (
             <>
-              <Badge variant="destructive">{row.original.status}</Badge>
+              <Badge variant="destructive">
+                {row.original.payment.status.toUpperCase()}
+              </Badge>
             </>
           );
-        case "CANCELED":
+        case "FAILED":
           return (
             <>
-              <Badge>{row.original.status}</Badge>
+              <Badge>{row.original.payment.status.toUpperCase()}</Badge>
             </>
           );
       }
@@ -88,23 +88,6 @@ export const overviewTableColumns: ColumnDef<OverviewTable>[] = [
       return (
         <>
           <Badge variant="secondary">UNKNOWN</Badge>
-        </>
-      );
-    },
-  },
-  {
-    header: "Action",
-    cell: ({ row }) => {
-      const view = row.original;
-
-      return (
-        <>
-          <Button
-            variant="outline"
-            onClick={() => console.log(view.invoice_number)}
-          >
-            View
-          </Button>
         </>
       );
     },

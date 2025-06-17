@@ -1,32 +1,125 @@
 import DashboardCard from "@/components/card.tsx";
-import { DollarSign, LinkIcon, Users } from "lucide-react";
+import { DollarSign, LinkIcon, LoaderCircle, Users } from "lucide-react";
 import { Card } from "@/components/ui/card.tsx";
 import { DataTable } from "@/components/datatable.tsx";
-import { overviewTableColumns } from "@/types/table-overview.tsx";
+import {
+  OverviewTable,
+  overviewTableColumns,
+} from "@/types/table-overview.tsx";
 import PageSize from "@/components/page-size.tsx";
 import TextFilter from "@/components/text-filter.tsx";
+import { useGetDonationHistoryQuery } from "@/api/core/donation-histories/get-donation-histories.api.ts";
+import { RootState } from "@/stores/store.ts";
+import { useSelector } from "react-redux";
+import { useSearchParams } from "react-router-dom";
+import { useGetDonationHistoryStatisticsQuery } from "@/api/core/donation-histories/get-donation-history-statistics.api.ts";
+import { Button } from "@/components/ui/button.tsx";
+import { Row } from "@tanstack/react-table";
+import { useState } from "react";
+import DonationHistoryModal from "@/components/donation-history-modal.tsx";
 
 export default function Home() {
+  const auth = useSelector((state: RootState) => state.auth);
+  const [searchParams] = useSearchParams();
+
+  const [openDialog, setOpenDialog] = useState<boolean>(false);
+  const [selectedDonation, setSelectedDonation] = useState<string>("");
+
+  const { data: histories, isLoading } = useGetDonationHistoryQuery([
+    auth.token || "",
+    {
+      q: searchParams.get("q"),
+      page: searchParams.get("page"),
+      size: searchParams.get("size"),
+      from: searchParams.get("from"),
+      to: searchParams.get("to"),
+    },
+  ]);
+
+  const { data: stats, isLoading: isLoadingHistory } =
+    useGetDonationHistoryStatisticsQuery([
+      auth.token || "",
+      {
+        from: searchParams.get("from"),
+        to: searchParams.get("to"),
+      },
+    ]);
+
+  const columns = [
+    ...overviewTableColumns,
+    {
+      header: "Action",
+      cell: ({ row }: { row: Row<OverviewTable> }) => {
+        const view = row.original;
+
+        return (
+          <>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSelectedDonation(view.human_readable_id);
+                setOpenDialog(true);
+              }}
+            >
+              View
+            </Button>
+          </>
+        );
+      },
+    },
+  ];
+
   return (
     <>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <DashboardCard
           label="Total Recieved Donation"
           icon={DollarSign}
-          amount="No data"
+          amount={
+            stats?.data && BigInt(stats.data.total_donations) > 0
+              ? BigInt(stats?.data?.total_donations).toLocaleString("id-ID", {
+                  style: "currency",
+                  currency: "IDR",
+                  maximumFractionDigits: 0,
+                  minimumFractionDigits: 0,
+                })
+              : "No data"
+          }
           description=""
+          isLoading={isLoadingHistory}
         />
         <DashboardCard
           label="Total User"
           icon={Users}
-          amount="No data"
+          amount={
+            stats?.data && BigInt(stats.data.total_users) > 0
+              ? BigInt(stats?.data?.total_users).toLocaleString("id-ID", {
+                  style: "decimal",
+                  maximumFractionDigits: 0,
+                  minimumFractionDigits: 0,
+                })
+              : "No data"
+          }
           description=""
+          isLoading={isLoadingHistory}
         />
         <DashboardCard
           label="Active Program"
           icon={LinkIcon}
-          amount="No data"
+          amount={
+            stats?.data && BigInt(stats.data.total_active_programs) > 0
+              ? BigInt(stats?.data?.total_active_programs).toLocaleString(
+                  "id-ID",
+                  {
+                    style: "decimal",
+                    maximumFractionDigits: 0,
+                    minimumFractionDigits: 0,
+                  }
+                )
+              : "No data"
+          }
           description=""
+          isLoading={isLoadingHistory}
         />
       </div>
       <Card>
@@ -36,38 +129,28 @@ export default function Home() {
             <PageSize />
             <TextFilter placeholder="Find Invoice Number" />
           </div>
-          {/*todo: check data*/}
-          {/*<>
-                  <div className="flex items-center justify-center">
-                    No data to be displayed
-                  </div>
-                </>*/}
-
-          <DataTable
-            columns={overviewTableColumns}
-            data={Array.from({ length: 20 }).map(() => ({
-              invoice_number: "INV-001",
-              date: new Date(),
-              donor_name: "John Doe",
-              program_name: "Education Support Program",
-              amount: 5000000000,
-              method: "Credit Card",
-              status: "PAID",
-            }))}
-            meta={{
-              total: 50,
-              per_page: 15,
-              current_page: 1,
-              last_page: 4,
-              first_page_url: "http://laravel.app?page=1",
-              last_page_url: "http://laravel.app?page=4",
-              next_page_url: "http://laravel.app?page=2",
-              prev_page_url: undefined,
-              path: "http://laravel.app",
-              from: 1,
-              to: 15,
-            }}
-          />
+          {isLoading ? (
+            <>
+              <div className="flex items-center justify-center min-h-80">
+                <LoaderCircle className="animate-spin" />
+              </div>
+            </>
+          ) : (
+            histories && (
+              <>
+                <DataTable
+                  columns={columns}
+                  data={histories?.data}
+                  meta={histories?.meta}
+                />
+                <DonationHistoryModal
+                  donationId={selectedDonation}
+                  isOpen={openDialog}
+                  onOpenChange={setOpenDialog}
+                />
+              </>
+            )
+          )}
         </div>
       </Card>
     </>

@@ -9,6 +9,8 @@ import { RouteList } from "@/lib/route-list.ts";
 import { Link, useLocation } from "react-router-dom";
 import Home from "@/page/home.tsx";
 import DonationProgram from "@/page/donation-program.tsx";
+import { Toaster } from "@/components/ui/toaster.tsx";
+import UsersMonitoring from "@/page/users-monitoring.tsx";
 
 export default function MainPage() {
   const route = useLocation();
@@ -41,10 +43,11 @@ export default function MainPage() {
             <DonationProgram />
           </TabsContent>
           <TabsContent className="space-y-4" value={RouteList.USER_MONITORING}>
-            Change your password here. ppk
+            <UsersMonitoring />
           </TabsContent>
         </Tabs>
       </div>
+      <Toaster />
     </>
   );
 }

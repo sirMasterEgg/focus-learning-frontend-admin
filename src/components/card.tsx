@@ -1,4 +1,4 @@
-import { LucideIcon } from "lucide-react";
+import { LoaderCircle, LucideIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 
 export type CardProps = {
@@ -6,6 +6,7 @@ export type CardProps = {
   icon: LucideIcon;
   amount: string;
   description: string;
+  isLoading?: boolean;
 };
 
 export default function DashboardCard(props: CardProps) {
@@ -16,8 +17,16 @@ export default function DashboardCard(props: CardProps) {
         <props.icon className="w-4 h-4 text-muted-foreground" />
       </div>
       <CardContent>
-        <div className="text-2xl font-bold">{props.amount}</div>
-        <p className="text-xs text-muted-foreground">{props.description}</p>
+        {props.isLoading ? (
+          <div className="flex items-center justify-center">
+            <LoaderCircle className="animate-spin" />
+          </div>
+        ) : (
+          <>
+            <div className="text-2xl font-bold">{props.amount}</div>
+            <p className="text-xs text-muted-foreground">{props.description}</p>
+          </>
+        )}
       </CardContent>
     </Card>
   );
