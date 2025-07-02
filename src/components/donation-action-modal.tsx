@@ -190,7 +190,7 @@ const EditDialog = ({
 
   return (
     <>
-      <DialogContent>
+      <DialogContent className="max-h-[calc(100vh_-_8rem)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditable ? "Edit Donation Program" : "View Donation Program"}
