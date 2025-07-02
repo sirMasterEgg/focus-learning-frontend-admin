@@ -1,6 +1,5 @@
-import { useQuill } from "react-quilljs";
 import "quill/dist/quill.snow.css";
-import { useEffect } from "react";
+import Editor from "@/components/Editor.tsx";
 
 type RichTextEditorProps = {
   value: string;
@@ -15,7 +14,7 @@ const RichTextEditor = ({
   placeholder,
   readOnly = false,
 }: RichTextEditorProps) => {
-  const { quill, quillRef } = useQuill({
+  /*const { quill, quillRef } = useQuill({
     modules: {
       toolbar: [
         ["bold", "italic", "underline"], // toggled buttons
@@ -70,12 +69,17 @@ const RichTextEditor = ({
         quill.off("text-change", handleTextChange);
       };
     }
-  }, [quill]);
+  }, [quill]);*/
 
   return (
     <>
       <div className="w-full min-h-10">
-        <div ref={quillRef}></div>
+        <Editor
+          defaultHtmlValue={value}
+          readOnly={readOnly}
+          placeholder={placeholder}
+          onChangeResult={onChange}
+        />
       </div>
     </>
   );
